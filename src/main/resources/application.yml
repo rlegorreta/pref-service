@@ -1,0 +1,88 @@
+server:
+  port: 8183
+  shutdown: graceful
+  netty:
+    connection-timeout: 2s
+    idle-timeout: 15s
+
+spring:
+  application:
+    name: pref-service
+  lifecycle:
+    timeout-per-shutdown-phase: 15s
+  config:
+    import: "optional:configserver:"   # Imports configuration data from a config server when available
+  cloud:
+    config:
+      uri: http://localhost:8071
+      request-connect-timeout: 5000   # Timeout on waiting to connect to the config server (ms)
+      request-read-timeout: 5000      # Timeout on waiting to read configuration data from the config server (ms)
+      fail-fast: true                 # In production, set to true. Makes a failure to connect to the config server fatal
+      retry:
+        max-attempts: 6
+        initial-interval: 1000        # Initial retry interval for backoff (ms)
+        max-interval: 2000            # Maximum retry interval for backoff (ms)
+        multiplier: 1.1               # Multiplier to compute the next interval
+  neo4j:
+    repositories:
+      type: imperative
+    uri: bolt://localhost:7687
+  profiles:
+    active: local
+  security:
+    oauth2:
+      client:
+        registration:
+          pref-service-client-credentials:
+            provider: spring
+            client-id: pref-service
+            client-secret: pref-service-secret
+            authorization-grant-type: client_credentials
+            scope: cartera.read
+            client-name: pref-service-client-credentials
+        provider:
+          spring:
+            issuer-uri: http://auth-service:9000
+            # ^ for localNoDocker & localCmdLine an 'auth' must be declared in hosts file
+        rest:
+          client-id: pref-service-client-credentials
+      resourceserver:
+        jwt:
+          issuer-uri: http://auth-service:9000
+
+# Also needed by AuthServerUserLookupService
+security:
+  clientId: pref-service
+
+logging:
+  level:
+    com:
+      netflix: WARN
+      springframework:
+        web: WARN
+        core:
+          codec:
+            StringDecoder: TRACE
+      ailegorreta:
+        prefservice: WARN
+  pattern:
+    level: '%5p [${spring.application.name:},%X{traceId:-},%X{spanId:-}]'
+
+info:
+  system: Marketplace AILegorreta
+
+# Monitoring with actuator
+management:
+  endpoints:
+    web:
+      exposure:
+        include: pref, env, health, heapdump, info, loggers, mappings, prometheus
+  endpoint:
+    health:
+      show-details: always
+      show-components: always
+      probes:
+        enabled: true
+
+pref-service:
+  test: false
